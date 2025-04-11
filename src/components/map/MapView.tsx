@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Search, MapPin, Star, Filter } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Search, MapPin, Star, Filter, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,11 +23,15 @@ import { Slider } from '@/components/ui/slider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { mockProfiles } from '@/data/mockData';
+import { useToast } from '@/components/ui/use-toast';
 
 const MapView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [distance, setDistance] = useState([5]);
+  const [isRecording, setIsRecording] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
   
   // Filter profiles based on search term
   const filteredProfiles = mockProfiles.filter(profile => 
@@ -36,6 +40,65 @@ const MapView = () => {
       skill.name.toLowerCase().includes(searchTerm.toLowerCase())
     )
   );
+
+  const handleVoiceSearch = () => {
+    if (!isRecording) {
+      // Check if browser supports speech recognition
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        setIsRecording(true);
+        
+        // Initialize SpeechRecognition
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        
+        recognition.lang = 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        
+        recognition.onstart = () => {
+          toast({
+            title: "Listening...",
+            description: "Speak now to search for services or professionals",
+          });
+        };
+        
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          setSearchTerm(transcript);
+          setIsRecording(false);
+          toast({
+            title: "Voice search completed",
+            description: `Searching for: "${transcript}"`,
+          });
+        };
+        
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error', event.error);
+          setIsRecording(false);
+          toast({
+            title: "Voice search error",
+            description: "Couldn't understand. Please try again.",
+            variant: "destructive"
+          });
+        };
+        
+        recognition.onend = () => {
+          setIsRecording(false);
+        };
+        
+        recognition.start();
+      } else {
+        toast({
+          title: "Voice search not supported",
+          description: "Your browser doesn't support voice search. Please type your query instead.",
+          variant: "destructive"
+        });
+      }
+    } else {
+      // If already recording, stop recording
+      setIsRecording(false);
+    }
+  };
 
   return (
     <div className="relative h-[calc(100vh-4rem)] w-full">
@@ -75,6 +138,11 @@ const MapView = () => {
                     <AvatarImage src={profile.avatar} alt={profile.name} />
                     <AvatarFallback>{profile.name.substring(0, 2)}</AvatarFallback>
                   </Avatar>
+                  
+                  {/* Service name label */}
+                  <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-2 py-0.5 rounded-md shadow-sm text-xs whitespace-nowrap">
+                    {profile.skills[0]?.name || "Service"}
+                  </div>
                 </div>
               </div>
             ))}
@@ -87,58 +155,69 @@ const MapView = () => {
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             type="search"
             placeholder="Search skills or people..."
-            className="pl-8 pr-14 py-5 rounded-full shadow-lg"
+            className="pl-8 pr-20 py-5 rounded-full shadow-lg"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="absolute right-1 top-1 h-8 rounded-full">
-                <Filter className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent>
-              <SheetHeader>
-                <SheetTitle>Filter Options</SheetTitle>
-              </SheetHeader>
-              <div className="py-6 space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Distance</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">0 km</span>
-                    <span className="text-xs font-medium">{distance[0]} km</span>
-                    <span className="text-xs text-muted-foreground">10 km</span>
+          <div className="absolute right-1 top-1 flex">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={`h-8 w-8 rounded-full mr-1 ${isRecording ? 'bg-red-100 text-red-500' : ''}`}
+              onClick={handleVoiceSearch}
+            >
+              {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 rounded-full">
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Filter Options</SheetTitle>
+                </SheetHeader>
+                <div className="py-6 space-y-6">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Distance</h3>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">0 km</span>
+                      <span className="text-xs font-medium">{distance[0]} km</span>
+                      <span className="text-xs text-muted-foreground">10 km</span>
+                    </div>
+                    <Slider
+                      defaultValue={[5]}
+                      max={10}
+                      step={1}
+                      onValueChange={setDistance}
+                    />
                   </div>
-                  <Slider
-                    defaultValue={[5]}
-                    max={10}
-                    step={1}
-                    onValueChange={setDistance}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Skills</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {['Plumbing', 'Electrical', 'Gardening', 'Cooking', 'Cleaning', 'Carpentry'].map((skill) => (
-                      <Badge key={skill} variant="outline" className="cursor-pointer hover:bg-secondary">
-                        {skill}
-                      </Badge>
-                    ))}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Skills</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {['Plumbing', 'Electrical', 'Gardening', 'Cooking', 'Cleaning', 'Carpentry'].map((skill) => (
+                        <Badge key={skill} variant="outline" className="cursor-pointer hover:bg-secondary">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Availability</h3>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="outline" className="cursor-pointer hover:bg-secondary">Available Now</Badge>
+                      <Badge variant="outline" className="cursor-pointer hover:bg-secondary">Today</Badge>
+                      <Badge variant="outline" className="cursor-pointer hover:bg-secondary">This Week</Badge>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Availability</h3>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="outline" className="cursor-pointer hover:bg-secondary">Available Now</Badge>
-                    <Badge variant="outline" className="cursor-pointer hover:bg-secondary">Today</Badge>
-                    <Badge variant="outline" className="cursor-pointer hover:bg-secondary">This Week</Badge>
-                  </div>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
         
         {searchTerm && (
