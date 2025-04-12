@@ -1,6 +1,6 @@
 
-import React, { useState, useRef } from 'react';
-import { Search, MapPin, Star, Filter, Mic, MicOff } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Search, Filter, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -24,14 +24,21 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { mockProfiles } from '@/data/mockData';
 import { useToast } from '@/components/ui/use-toast';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import MapComponent from './MapComponent';
+import ServicesList from './ServicesList';
 
 const MapView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [distance, setDistance] = useState([5]);
   const [isRecording, setIsRecording] = useState(false);
+  const [mapContainerRef, setMapContainerRef] = useState<HTMLDivElement | null>(null);
+  const [locationSearch, setLocationSearch] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const locationInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const mapComponentRef = useRef<any>(null);
   
   // Filter profiles based on search term
   const filteredProfiles = mockProfiles.filter(profile => 
@@ -100,54 +107,29 @@ const MapView = () => {
     }
   };
 
+  // Handle location search
+  const handleLocationSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (locationSearch.trim() && mapComponentRef.current) {
+      mapComponentRef.current.searchLocation(locationSearch);
+    }
+  };
+
+  // Initialize map component
+  const { mapContainer, searchLocation } = MapComponent({ 
+    onSelectProfile: setSelectedProfile 
+  });
+
+  // Store map component functions in ref for access elsewhere
+  useEffect(() => {
+    mapComponentRef.current = { searchLocation };
+  }, [searchLocation]);
+
   return (
-    <div className="relative h-[calc(100vh-4rem)] w-full">
-      {/* Map placeholder - in a real app, this would be your map component */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center">
-        <div className="text-center p-4 rounded-lg">
-          <div className="relative w-full h-full">
-            {/* This would be replaced with actual map implementation */}
-            <div className="absolute inset-0 grid grid-cols-6 grid-rows-6 gap-4 p-8 opacity-20">
-              {Array.from({ length: 36 }).map((_, i) => (
-                <div 
-                  key={i} 
-                  className="relative"
-                >
-                  <div className="absolute inset-0 rounded-full border-2 border-skillscape-400"></div>
-                </div>
-              ))}
-            </div>
-            
-            {mockProfiles.map((profile, index) => (
-              <div 
-                key={index}
-                className="absolute cursor-pointer"
-                style={{ 
-                  top: `${20 + Math.random() * 60}%`, 
-                  left: `${20 + Math.random() * 60}%` 
-                }}
-                onClick={() => setSelectedProfile(profile)}
-              >
-                <div className="relative">
-                  <MapPin 
-                    size={36} 
-                    className={`text-skillscape-600 ${profile.isAvailable ? 'animate-pulse' : ''}`} 
-                    fill={profile.isAvailable ? 'rgba(14, 165, 233, 0.2)' : 'transparent'} 
-                  />
-                  <Avatar className="absolute -top-1 -left-1 h-6 w-6 border-2 border-white">
-                    <AvatarImage src={profile.avatar} alt={profile.name} />
-                    <AvatarFallback>{profile.name.substring(0, 2)}</AvatarFallback>
-                  </Avatar>
-                  
-                  {/* Service name label */}
-                  <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-2 py-0.5 rounded-md shadow-sm text-xs whitespace-nowrap">
-                    {profile.skills[0]?.name || "Service"}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+    <div className="relative h-[calc(100vh-4rem)] w-full flex flex-col">
+      {/* Map container */}
+      <div className="relative flex-grow">
+        <div ref={mapContainer} className="absolute inset-0" />
       </div>
       
       {/* Search and filter overlay */}
@@ -255,10 +237,41 @@ const MapView = () => {
           </Card>
         )}
       </div>
+
+      {/* Location search input */}
+      <div className="absolute top-20 left-0 right-0 mx-auto w-full max-w-md px-4">
+        <form onSubmit={handleLocationSearch} className="relative">
+          <Input
+            ref={locationInputRef}
+            type="text"
+            placeholder="Search location..."
+            className="pr-16 py-2 rounded-full shadow-md"
+            value={locationSearch}
+            onChange={(e) => setLocationSearch(e.target.value)}
+          />
+          <Button 
+            type="submit"
+            size="sm"
+            className="absolute right-1 top-1 rounded-full"
+          >
+            Go
+          </Button>
+        </form>
+      </div>
+      
+      {/* Services list */}
+      <div className="absolute bottom-0 left-0 right-0 w-full bg-background/90 backdrop-blur-sm border-t border-border">
+        <div className="max-w-4xl mx-auto px-4 py-2">
+          <ServicesList 
+            services={mockProfiles} 
+            onSelectService={setSelectedProfile} 
+          />
+        </div>
+      </div>
       
       {/* Selected Profile Card */}
       {selectedProfile && (
-        <div className="absolute bottom-4 left-0 right-0 mx-auto w-full max-w-md px-4">
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4 z-50">
           <Card className="shadow-lg">
             <CardHeader className="pb-2">
               <div className="flex justify-between items-start">
