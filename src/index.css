@@ -131,3 +131,34 @@
   @apply bg-skillscape-300 text-skillscape-900 hover:bg-skillscape-400;
 }
 
+/* Custom map marker styles */
+.custom-marker {
+  transform: translate(-50%, -100%);
+  transition: all 0.2s ease;
+}
+
+.custom-marker:hover {
+  transform: translate(-50%, -100%) scale(1.1);
+}
+
+.mapboxgl-popup {
+  max-width: 200px;
+}
+
+.mapboxgl-popup-content {
+  padding: 10px;
+  border-radius: 8px;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translate(-50%, -100%);
+  }
+  50% {
+    transform: translate(-50%, -110%);
+  }
+}
+
+.custom-marker-bounce {
+  animation: bounce 0.8s ease infinite;
+}
