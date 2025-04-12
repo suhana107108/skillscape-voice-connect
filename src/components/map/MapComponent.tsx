@@ -17,6 +17,32 @@ const MapComponent: React.FC<MapComponentProps> = ({ onSelectProfile }) => {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<[number, number]>([30, 15]);
   const markers = useRef<{ [key: string]: mapboxgl.Marker }>({});
+  const mapRefElement = useRef<HTMLDivElement>(null);
+
+  // Function to update location that will be exposed to parent component
+  const searchLocation = (query: string) => {
+    if (!map.current) return;
+    
+    fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.features && data.features.length > 0) {
+          const [lng, lat] = data.features[0].center;
+          
+          if (map.current) {
+            map.current.flyTo({
+              center: [lng, lat],
+              zoom: 13,
+              essential: true
+            });
+            setCurrentLocation([lng, lat]);
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error searching location:', error);
+      });
+  };
 
   // Initialize map when component mounts
   useEffect(() => {
@@ -86,45 +112,23 @@ const MapComponent: React.FC<MapComponentProps> = ({ onSelectProfile }) => {
     };
   }, [onSelectProfile]);
 
-  // Function to update location
-  const searchLocation = (query: string) => {
-    if (!map.current) return;
-    
-    fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.features && data.features.length > 0) {
-          const [lng, lat] = data.features[0].center;
-          
-          if (map.current) {
-            map.current.flyTo({
-              center: [lng, lat],
-              zoom: 13,
-              essential: true
-            });
-            setCurrentLocation([lng, lat]);
-          }
-        }
-      })
-      .catch(error => {
-        console.error('Error searching location:', error);
-      });
-  };
+  // Expose the searchLocation method to the parent component
+  useEffect(() => {
+    if (mapRefElement.current) {
+      // @ts-ignore - We're using this to expose the method to the parent
+      mapRefElement.current.searchLocation = searchLocation;
+    }
+  }, []);
 
   return (
     <div className="h-full w-full">
-      <div ref={mapContainer} className="h-full w-full" />
-      {/* We return the mapContainer and searchLocation for use in the parent component */}
-      {React.createElement('div', { style: { display: 'none' }, 
-        ref: (el) => {
-          if (el) {
-            // @ts-ignore - We're using this to pass data to the parent
-            el.mapContainerRef = mapContainer;
-            // @ts-ignore
-            el.searchLocation = searchLocation;
-          }
-        }
-      })}
+      <div ref={mapContainer} className="h-full w-full" data-map-container="true" />
+      {/* We use this element to expose the searchLocation method to the parent component */}
+      <div 
+        ref={mapRefElement}
+        style={{ display: 'none' }} 
+        data-map-ref="true"
+      />
     </div>
   );
 };
