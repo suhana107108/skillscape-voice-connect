@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Filter, Mic, MicOff } from 'lucide-react';
+import { Search, Filter, Mic, MicOff, Star, MapPin, Compass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -33,12 +32,11 @@ const MapView = () => {
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [distance, setDistance] = useState([5]);
   const [isRecording, setIsRecording] = useState(false);
-  const [mapContainerRef, setMapContainerRef] = useState<HTMLDivElement | null>(null);
   const [locationSearch, setLocationSearch] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const locationInputRef = useRef<HTMLInputElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const mapComponentRef = useRef<any>(null);
   
   // Filter profiles based on search term
   const filteredProfiles = mockProfiles.filter(profile => 
@@ -47,6 +45,26 @@ const MapView = () => {
       skill.name.toLowerCase().includes(searchTerm.toLowerCase())
     )
   );
+
+  // Handle getting a reference to the map container and search function
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.addedNodes.length) {
+          // @ts-ignore
+          const mapNode = document.querySelector('[data-map-container="true"]');
+          if (mapNode) {
+            // @ts-ignore
+            mapRef.current = mapNode;
+          }
+        }
+      });
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    return () => observer.disconnect();
+  }, []);
 
   const handleVoiceSearch = () => {
     if (!isRecording) {
@@ -110,30 +128,58 @@ const MapView = () => {
   // Handle location search
   const handleLocationSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (locationSearch.trim() && mapComponentRef.current) {
-      mapComponentRef.current.searchLocation(locationSearch);
+    
+    if (locationSearch.trim()) {
+      // Access the searchLocation function from the MapComponent
+      // @ts-ignore - we know this exists
+      const mapContainerEl = document.querySelector('[data-map-ref="true"]');
+      if (mapContainerEl && mapContainerEl.searchLocation) {
+        mapContainerEl.searchLocation(locationSearch);
+        toast({
+          title: "Location updated",
+          description: `Moved to ${locationSearch}`,
+        });
+      }
     }
   };
-
-  // Initialize map component
-  const { mapContainer, searchLocation } = MapComponent({ 
-    onSelectProfile: setSelectedProfile 
-  });
-
-  // Store map component functions in ref for access elsewhere
-  useEffect(() => {
-    mapComponentRef.current = { searchLocation };
-  }, [searchLocation]);
 
   return (
     <div className="relative h-[calc(100vh-4rem)] w-full flex flex-col">
       {/* Map container */}
       <div className="relative flex-grow">
-        <div ref={mapContainer} className="absolute inset-0" />
+        <MapComponent onSelectProfile={setSelectedProfile} />
+        
+        {/* Google Maps-like UI elements */}
+        <div className="absolute bottom-6 right-6 flex flex-col gap-2">
+          <Button 
+            variant="secondary" 
+            size="icon" 
+            className="rounded-full shadow-lg h-12 w-12 bg-white hover:bg-gray-100"
+            onClick={() => {
+              // Trigger geolocation
+              const geolocateButton = document.querySelector('.mapboxgl-ctrl-geolocate');
+              if (geolocateButton) {
+                // @ts-ignore
+                geolocateButton.click();
+              }
+            }}
+          >
+            <Compass className="h-6 w-6 text-gray-700" />
+          </Button>
+          
+          <div className="flex flex-col gap-2 bg-white rounded-full shadow-lg p-1">
+            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
+              <span className="text-xl font-bold">+</span>
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
+              <span className="text-xl font-bold">-</span>
+            </Button>
+          </div>
+        </div>
       </div>
       
       {/* Search and filter overlay */}
-      <div className="absolute top-4 left-0 right-0 mx-auto w-full max-w-md px-4">
+      <div className="absolute top-4 left-0 right-0 mx-auto w-full max-w-md px-4 z-10">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -238,14 +284,15 @@ const MapView = () => {
         )}
       </div>
 
-      {/* Location search input */}
-      <div className="absolute top-20 left-0 right-0 mx-auto w-full max-w-md px-4">
+      {/* Location search input - styled more like Google Maps */}
+      <div className="absolute top-20 left-0 right-0 mx-auto w-full max-w-md px-4 z-10">
         <form onSubmit={handleLocationSearch} className="relative">
+          <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             ref={locationInputRef}
             type="text"
             placeholder="Search location..."
-            className="pr-16 py-2 rounded-full shadow-md"
+            className="pl-8 pr-16 py-2 rounded-full shadow-md"
             value={locationSearch}
             onChange={(e) => setLocationSearch(e.target.value)}
           />
@@ -260,7 +307,7 @@ const MapView = () => {
       </div>
       
       {/* Services list */}
-      <div className="absolute bottom-0 left-0 right-0 w-full bg-background/90 backdrop-blur-sm border-t border-border">
+      <div className="absolute bottom-0 left-0 right-0 w-full bg-background/90 backdrop-blur-sm border-t border-border" style={{ zIndex: 1000 }}>
         <div className="max-w-4xl mx-auto px-4 py-2">
           <ServicesList 
             services={mockProfiles} 
@@ -368,6 +415,12 @@ const MapView = () => {
           </Card>
         </div>
       )}
+      
+      {/* Hidden element to get references to map methods */}
+      <div 
+        style={{ display: 'none' }} 
+        data-map-ref="true"
+      />
     </div>
   );
 };

@@ -6,7 +6,7 @@ import { Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface Service {
-  id: string;
+  id: string | number; // Updated to accept both string and number
   name: string;
   avatar: string;
   rating: number;
