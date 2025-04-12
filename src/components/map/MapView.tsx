@@ -15,16 +15,74 @@ const MapView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [locationSearch, setLocationSearch] = useState('');
+  const [filterBySkills, setFilterBySkills] = useState<string[]>([]);
+  const [filterByAvailability, setFilterByAvailability] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState({
+    skills: [] as string[],
+    availability: false
+  });
+  
   const mapRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
-  // Filter profiles based on search term
-  const filteredProfiles = mockProfiles.filter(profile => 
-    profile.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    profile.skills.some(skill => 
-      skill.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  // Filter profiles based on search term, skills, and availability
+  const filteredProfiles = React.useMemo(() => {
+    return mockProfiles.filter(profile => {
+      // First apply search term filter
+      const matchesSearch = 
+        searchTerm === '' || 
+        profile.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        profile.skills.some(skill => 
+          skill.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      
+      if (!matchesSearch) return false;
+      
+      // Then apply skill filters if any are selected
+      const matchesSkills = 
+        appliedFilters.skills.length === 0 || 
+        profile.skills.some(skill => 
+          appliedFilters.skills.includes(skill.name)
+        );
+      
+      if (!matchesSkills) return false;
+      
+      // Then apply availability filter if enabled
+      const matchesAvailability = 
+        !appliedFilters.availability ||
+        profile.isAvailable;
+      
+      return matchesAvailability;
+    });
+  }, [searchTerm, appliedFilters]);
+
+  // Apply filters function
+  const applyFilters = () => {
+    setAppliedFilters({
+      skills: filterBySkills,
+      availability: filterByAvailability
+    });
+    
+    toast({
+      title: "Filters applied",
+      description: `Showing ${filterBySkills.length > 0 ? filterBySkills.join(', ') : 'all'} skills${filterByAvailability ? ' (available only)' : ''}`,
+    });
+  };
+
+  // Clear filters function
+  const clearFilters = () => {
+    setFilterBySkills([]);
+    setFilterByAvailability(false);
+    setAppliedFilters({
+      skills: [],
+      availability: false
+    });
+    
+    toast({
+      title: "Filters cleared",
+      description: "Showing all services",
+    });
+  };
 
   // Handle getting a reference to the map container
   useEffect(() => {
@@ -122,8 +180,15 @@ const MapView = () => {
       <div className="absolute bottom-0 left-0 right-0 w-full bg-background/90 backdrop-blur-sm border-t border-border" style={{ zIndex: 1000 }}>
         <div className="max-w-4xl mx-auto px-4 py-2">
           <ServicesList 
-            services={mockProfiles} 
-            onSelectService={setSelectedProfile} 
+            services={mockProfiles}
+            filteredServices={filteredProfiles}
+            onSelectService={setSelectedProfile}
+            filterBySkills={filterBySkills}
+            setFilterBySkills={setFilterBySkills}
+            filterByAvailability={filterByAvailability}
+            setFilterByAvailability={setFilterByAvailability}
+            applyFilters={applyFilters}
+            clearFilters={clearFilters}
           />
         </div>
       </div>

@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Star, MapPin } from 'lucide-react';
+import { Star, MapPin, Filter, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -11,7 +11,18 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
+  DrawerFooter,
 } from "@/components/ui/drawer";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+
+interface Skill {
+  name: string;
+  level: string;
+  hourlyRate: number;
+}
 
 interface Service {
   id: string | number;
@@ -20,16 +31,55 @@ interface Service {
   rating: number;
   reviews: number;
   isAvailable: boolean;
-  skills: { name: string; level: string; hourlyRate: number }[];
+  skills: Skill[];
   location: string;
 }
 
 interface ServicesListProps {
   services: Service[];
   onSelectService: (service: Service) => void;
+  filteredServices?: Service[];
+  filterBySkills: string[];
+  setFilterBySkills: (skills: string[]) => void;
+  filterByAvailability: boolean;
+  setFilterByAvailability: (status: boolean) => void;
+  applyFilters: () => void;
+  clearFilters: () => void;
 }
 
-const ServicesList: React.FC<ServicesListProps> = ({ services, onSelectService }) => {
+const ServicesList: React.FC<ServicesListProps> = ({ 
+  services, 
+  onSelectService,
+  filteredServices,
+  filterBySkills,
+  setFilterBySkills,
+  filterByAvailability,
+  setFilterByAvailability,
+  applyFilters,
+  clearFilters
+}) => {
+  // Get all unique skills from services
+  const allSkills = React.useMemo(() => {
+    const skillsSet = new Set<string>();
+    services.forEach(service => {
+      service.skills.forEach(skill => {
+        skillsSet.add(skill.name);
+      });
+    });
+    return Array.from(skillsSet).sort();
+  }, [services]);
+
+  const displayServices = filteredServices || services;
+  
+  // Handle skill checkbox change
+  const handleSkillChange = (skillName: string, checked: boolean) => {
+    if (checked) {
+      setFilterBySkills([...filterBySkills, skillName]);
+    } else {
+      setFilterBySkills(filterBySkills.filter(skill => skill !== skillName));
+    }
+  };
+
   return (
     <div className="w-full">
       <Drawer>
@@ -39,28 +89,46 @@ const ServicesList: React.FC<ServicesListProps> = ({ services, onSelectService }
               <MapPin className="h-5 w-5 mr-2 text-primary" />
               Available Services
               <Badge variant="outline" className="ml-2">
-                {services.length}
+                {displayServices.length}
               </Badge>
             </h2>
-            <div className="w-10 h-1 rounded-full bg-muted mx-auto" />
+            <div className="flex items-center">
+              {(filterBySkills.length > 0 || filterByAvailability) && (
+                <Badge variant="secondary" className="mr-2">
+                  Filters Active
+                </Badge>
+              )}
+              <div className="w-10 h-1 rounded-full bg-muted mx-auto" />
+            </div>
           </div>
         </DrawerTrigger>
         <DrawerContent className="max-h-[80vh]">
           <DrawerHeader className="border-b pb-2">
-            <DrawerTitle className="flex items-center">
-              <MapPin className="h-5 w-5 mr-2 text-primary" />
-              Available Services ({services.length})
+            <DrawerTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <MapPin className="h-5 w-5 mr-2 text-primary" />
+                Available Services ({displayServices.length})
+              </div>
+              <Button variant="outline" size="sm" onClick={() => {
+                const filterDrawer = document.getElementById('filter-drawer');
+                if (filterDrawer) {
+                  filterDrawer.click();
+                }
+              }}>
+                <Filter className="h-4 w-4 mr-2" />
+                Filter
+              </Button>
             </DrawerTitle>
           </DrawerHeader>
           
           <ScrollArea className="h-[calc(80vh-4rem)] px-4 pt-2">
-            {services.length === 0 ? (
+            {displayServices.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                No services available in this area
+                No services available with the current filters
               </div>
             ) : (
               <div className="grid gap-3 pb-6">
-                {services.map((service) => (
+                {displayServices.map((service) => (
                   <ServiceCard 
                     key={service.id} 
                     service={service} 
@@ -70,6 +138,69 @@ const ServicesList: React.FC<ServicesListProps> = ({ services, onSelectService }
               </div>
             )}
           </ScrollArea>
+          
+          {/* Filter Drawer */}
+          <Drawer>
+            <DrawerTrigger asChild>
+              <div id="filter-drawer" className="hidden">Filter</div>
+            </DrawerTrigger>
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle>Filter Services</DrawerTitle>
+              </DrawerHeader>
+              <div className="p-4 space-y-6">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Availability</h3>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="available-filter"
+                      checked={filterByAvailability}
+                      onCheckedChange={setFilterByAvailability}
+                    />
+                    <label htmlFor="available-filter" className="text-sm cursor-pointer">
+                      Show only available providers
+                    </label>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Skills</h3>
+                  <ScrollArea className="h-[200px] pr-4">
+                    <div className="space-y-2">
+                      {allSkills.map(skill => (
+                        <div key={skill} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`skill-${skill}`}
+                            checked={filterBySkills.includes(skill)}
+                            onCheckedChange={(checked) => handleSkillChange(skill, checked === true)}
+                          />
+                          <label 
+                            htmlFor={`skill-${skill}`}
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {skill}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </div>
+              <DrawerFooter className="border-t pt-2">
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={clearFilters} className="w-full">
+                    Clear All
+                  </Button>
+                  <Button onClick={applyFilters} className="w-full">
+                    Apply Filters
+                  </Button>
+                </div>
+              </DrawerFooter>
+            </DrawerContent>
+          </Drawer>
+          
         </DrawerContent>
       </Drawer>
     </div>

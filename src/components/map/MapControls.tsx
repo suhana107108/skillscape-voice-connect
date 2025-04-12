@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Compass } from 'lucide-react';
+import { Compass, Filter } from 'lucide-react';
 
 interface MapControlsProps {
   onLocate: () => void;
@@ -10,6 +10,13 @@ interface MapControlsProps {
 }
 
 const MapControls: React.FC<MapControlsProps> = ({ onLocate, onZoomIn, onZoomOut }) => {
+  const openFilterDrawer = () => {
+    const filterDrawer = document.getElementById('filter-drawer');
+    if (filterDrawer) {
+      filterDrawer.click();
+    }
+  };
+
   return (
     <div className="absolute bottom-6 right-6 flex flex-col gap-2">
       <Button 
@@ -19,6 +26,15 @@ const MapControls: React.FC<MapControlsProps> = ({ onLocate, onZoomIn, onZoomOut
         onClick={onLocate}
       >
         <Compass className="h-6 w-6 text-gray-700" />
+      </Button>
+      
+      <Button 
+        variant="secondary" 
+        size="icon" 
+        className="rounded-full shadow-lg h-12 w-12 bg-white hover:bg-gray-100"
+        onClick={openFilterDrawer}
+      >
+        <Filter className="h-6 w-6 text-gray-700" />
       </Button>
       
       <div className="flex flex-col gap-2 bg-white rounded-full shadow-lg p-1">
